@@ -1,5 +1,5 @@
 name: app-build-action
-#推送Tag时触发
+#推送Tag 时触发
 on:
   push:
     tags:
