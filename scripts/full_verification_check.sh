@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# 完整的验证方案脚本 - 确保所有Kotlin版本引用一致
+# 完整的验证方案脚本 - 确保所有Kotlin版本引用一致和media_kit包版本降级
 
 # 打印标题
 function print_title() {
@@ -70,6 +70,21 @@ echo "cd d:\github\dart_simple_live\simple_live_app && flutter build apk --debug
 echo "\n# 为Android构建APK (simple_live_tv_app)"
 echo "cd d:\github\dart_simple_live\simple_live_tv_app && flutter build apk --debug"
 
+# 检查media_kit版本
+print_title "检查media_kit包版本"
+
+echo "在simple_live_app中的版本:"
+grep -A 3 "视频播放" d:\github\dart_simple_live\simple_live_app\pubspec.yaml
+
+echo "\n在simple_live_tv_app中的版本:"
+grep -A 3 "视频播放" d:\github\dart_simple_live\simple_live_tv_app\pubspec.yaml
+
 print_title "验证完成"
-echo "请执行上述编译命令来确保修改后的配置能够正常工作。"
-echo "如果编译失败，请检查是否有其他未发现的配置引用。"
+echo "请执行以下步骤来确保修改后的配置能够正常工作："
+echo "1. 清理并获取依赖："
+echo "   cd d:\github\dart_simple_live\simple_live_app && flutter clean && flutter pub get"
+echo "   cd d:\github\dart_simple_live\simple_live_tv_app && flutter clean && flutter pub get"
+echo "2. 编译验证："
+echo "   cd d:\github\dart_simple_live\simple_live_app && flutter build apk --debug"
+echo "   cd d:\github\dart_simple_live\simple_live_tv_app && flutter build apk --debug"
+echo "\n降级media_kit到0.13.x版本系列应该解决SDK 36预览版的问题，现在可以正常使用SDK 34进行编译。"
