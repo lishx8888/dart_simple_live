@@ -51,10 +51,10 @@ dependencies:
   device_info_plus: ^9.1.2 #设备信息
   wakelock_plus: ^1.2.11 #屏幕常亮，media_kit中自带，但似乎不生效
 
-  # 视频播放 - 降级到不需要SDK 36的版本
-  media_kit: 0.13.11
-  media_kit_video: 0.15.5
-  media_kit_libs_video: 1.0.3
+  # 视频播放 - 使用兼容版本避免SDK 36依赖
+  media_kit: ^1.0.11
+  media_kit_video: ^1.1.8
+  media_kit_libs_video: ^1.0.3
 
 dependency_overrides:
   fading_edge_scrollview: ^4.1.1
