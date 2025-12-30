@@ -58,7 +58,15 @@ jobs:
           
           if [ "${{ github.event.inputs.build_mode }}" = "release" ]; then
             echo "Building unsigned release APK..."
-            flutter build apk --release --no-codesign --split-per-abi
+            # 临时删除签名配置以生成未签名的APK
+            if [ -f "android/key.properties" ]; then
+              mv android/key.properties android/key.properties.backup
+            fi
+            flutter build apk --release --split-per-abi
+            # 恢复签名配置
+            if [ -f "android/key.properties.backup" ]; then
+              mv android/key.properties.backup android/key.properties
+            fi
           else
             echo "Building debug APK..."
             flutter build apk --debug
