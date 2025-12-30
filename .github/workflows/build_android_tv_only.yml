@@ -124,19 +124,24 @@ jobs:
 
       - name: Show APK info
         run: |
-          cd simple_live_tv_app
           echo "=== Android TV APK Build Summary ==="
+          echo "Current directory: $(pwd)"
           echo "Build Type: ${{ github.event.inputs.build_type || 'debug' }}"
           echo "Target: Android TV"
           echo "Flutter Version: ${{ github.event.inputs.flutter_version || '3.38.5' }}"
           echo ""
           
+          # 检查目录结构
+          echo "Checking directory structure:"
+          ls -la simple_live_tv_app/
+          echo ""
+          
           if [ "${{ github.event.inputs.build_type }}" = "release" ]; then
             echo "Generated APK files:"
-            ls -lh build/app/outputs/flutter-apk/*.apk
+            ls -lh simple_live_tv_app/build/app/outputs/flutter-apk/*.apk
             echo ""
             echo "APK Size Summary:"
-            for apk in build/app/outputs/flutter-apk/*.apk; do
+            for apk in simple_live_tv_app/build/app/outputs/flutter-apk/*.apk; do
               if [ -f "$apk" ]; then
                 size=$(ls -lh "$apk" | awk '{print $5}')
                 filename=$(basename "$apk")
@@ -145,9 +150,9 @@ jobs:
             done
           else
             echo "Debug APK:"
-            ls -lh build/app/outputs/flutter-apk/*.apk
+            ls -lh simple_live_tv_app/build/app/outputs/flutter-apk/*.apk
           fi
           
           echo ""
           echo "Build Info:"
-          cat tv_build_info.txt
+          cat simple_live_tv_app/tv_build_info.txt
