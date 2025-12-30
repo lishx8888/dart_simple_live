@@ -90,17 +90,18 @@ jobs:
             fi
             
             echo "APK build completed successfully!"
-            ls -la build/outputs/flutter-apk/
+            ls -la build/app/outputs/flutter-apk/
             
           else
             echo "Building debug APK for Android TV..."
             flutter build apk --debug
             echo "Debug APK build completed successfully!"
-            ls -la build/outputs/flutter-apk/
+            ls -la build/app/outputs/flutter-apk/
             ARCH_TYPE="Universal"
           fi
           
           # Create build info file
+          cd simple_live_tv_app
           cat > tv_build_info.txt << EOF
           Build Type: ${{ github.event.inputs.build_type || 'debug' }}
           Build Time: $(date)
@@ -117,7 +118,7 @@ jobs:
         with:
           name: android-tv-apk-${{ github.event.inputs.build_type || 'debug' }}
           path: |
-            simple_live_tv_app/build/outputs/flutter-apk/*.apk
+            simple_live_tv_app/build/app/outputs/flutter-apk/*.apk
             simple_live_tv_app/tv_build_info.txt
           retention-days: 30
 
@@ -131,10 +132,10 @@ jobs:
           
           if [ "${{ github.event.inputs.build_type }}" = "release" ]; then
             echo "Generated APK files:"
-            ls -lh simple_live_tv_app/build/outputs/flutter-apk/*.apk
+            ls -lh simple_live_tv_app/build/app/outputs/flutter-apk/*.apk
             echo ""
             echo "APK Size Summary:"
-            for apk in simple_live_tv_app/build/outputs/flutter-apk/*.apk; do
+            for apk in simple_live_tv_app/build/app/outputs/flutter-apk/*.apk; do
               if [ -f "$apk" ]; then
                 size=$(ls -lh "$apk" | awk '{print $5}')
                 filename=$(basename "$apk")
@@ -143,7 +144,7 @@ jobs:
             done
           else
             echo "Debug APK:"
-            ls -lh simple_live_tv_app/build/outputs/flutter-apk/*.apk
+            ls -lh simple_live_tv_app/build/app/outputs/flutter-apk/*.apk
           fi
           
           echo ""
