@@ -40,11 +40,12 @@ android {
     }
 
     signingConfigs {
+        // 创建release签名配置，使用默认值避免null错误
         create("release") {
-            keyAlias = keystoreProperties["keyAlias"] as String
-            keyPassword = keystoreProperties["keyPassword"] as String
+            keyAlias = keystoreProperties["keyAlias"] as? String ?: "simple_live_tv"
+            keyPassword = keystoreProperties["keyPassword"] as? String ?: "android"
             storeFile = keystoreProperties["storeFile"]?.let { file(it) }
-            storePassword = keystoreProperties["storePassword"] as String
+            storePassword = keystoreProperties["storePassword"] as? String ?: "android"
             isV1SigningEnabled = true
             isV2SigningEnabled = true
         }
@@ -52,8 +53,13 @@ android {
 
     buildTypes {
         release {
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("release")
+            // 只有在有签名配置时才使用release签名，否则使用debug签名
+            if (keystoreProperties.containsKey("storeFile")) {
+                signingConfig = signingConfigs.getByName("release")
+            } else {
+                // 使用默认签名（debug签名）
+                signingConfig = signingConfigs.findByName("debug") ?: signingConfigs.getByName("release")
+            }
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(
