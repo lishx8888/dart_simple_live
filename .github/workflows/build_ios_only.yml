@@ -1,0 +1,159 @@
+name: Build iOS IPA Only
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_mode:
+        description: 'Build mode'
+        required: true
+        default: 'release'
+        type: choice
+        options:
+          - release
+          - debug
+      configuration:
+        description: 'Build configuration'
+        required: true
+        default: 'Release'
+        type: choice
+        options:
+          - Release
+          - Debug
+      scheme:
+        description: 'Xcode scheme'
+        required: false
+        default: 'Runner'
+        type: string
+      ios_version:
+        description: 'iOS deployment target'
+        required: false
+        default: '12.0'
+        type: string
+
+jobs:
+  build-ios:
+    runs-on: macos-latest
+    
+    permissions:
+      contents: read
+    
+    steps:
+      # 签出代码
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # 设置Flutter环境
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.38.5"
+          channel: "stable"
+          cache: true
+
+      # 获取iOS依赖
+      - name: Get dependencies
+        run: |
+          cd simple_live_app
+          flutter pub get
+
+      # 安装iOS依赖
+      - name: Install iOS dependencies
+        run: |
+          cd simple_live_app/ios
+          pod install
+
+      # 构建iOS应用
+      - name: Build iOS App
+        run: |
+          cd simple_live_app
+          
+          if [ "${{ github.event.inputs.build_mode }}" = "release" ]; then
+            echo "Building iOS release app..."
+            flutter build ios --release --no-codesign
+          else
+            echo "Building iOS debug app..."
+            flutter build ios --debug --no-codesign
+          fi
+
+      # 创建IPA文件
+      - name: Create IPA
+        run: |
+          cd simple_live_app
+          
+          # 创建Payload目录结构
+          mkdir -p build/ios/iphoneos/Payload
+          
+          # 复制.app文件到Payload目录
+          cp -R build/ios/iphoneos/Runner.app build/ios/iphoneos/Payload/
+          
+          # 切换到iphoneos目录并创建IPA
+          cd build/ios/iphoneos
+          zip -r ios_no_sign.ipa Payload
+          
+          # 清理临时文件
+          rm -rf Payload
+          
+          # 返回项目根目录
+          cd ../../../..
+
+      # 显示IPA信息
+      - name: Show IPA info
+        run: |
+          cd simple_live_app
+          echo "=== Generated IPA files ==="
+          find build/ios/iphoneos -name "*.ipa" -exec ls -lh {} \;
+          echo ""
+          echo "=== IPA Details ==="
+          find build/ios/iphoneos -name "*.ipa" -exec echo "File: {}" \; -exec file {} \;
+
+      # 检查.app文件大小
+      - name: Check .app size
+        run: |
+          cd simple_live_app
+          if [ -d "build/ios/iphoneos/Runner.app" ]; then
+            echo "=== .app bundle size ==="
+            du -sh build/ios/iphoneos/Runner.app
+          fi
+
+      # 上传IPA到Artifacts
+      - name: Upload IPA to Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-ipa-${{ github.event.inputs.build_mode }}
+          path: |
+            simple_live_app/build/ios/iphoneos/*.ipa
+          retention-days: 7
+
+      # 上传.app bundle（可选）
+      - name: Upload .app bundle to Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-app-bundle-${{ github.event.inputs.build_mode }}
+          path: |
+            simple_live_app/build/ios/iphoneos/Runner.app
+          retention-days: 7
+
+      # 创建构建摘要
+      - name: Create build summary
+        run: |
+          cd simple_live_app
+          echo "## iOS IPA Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Build Mode**: ${{ github.event.inputs.build_mode }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Configuration**: ${{ github.event.inputs.configuration }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Scheme**: ${{ github.event.inputs.scheme }}" >> $GITHUB_STEP_SUMMARY
+          echo "**iOS Version**: ${{ github.event.inputs.ios_version }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Flutter Version**: 3.38.5" >> $GITHUB_STEP_SUMMARY
+          echo "**Build Time**: $(date)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ -f "build/ios/iphoneos/ios_no_sign.ipa" ]; then
+            echo "### Generated Files" >> $GITHUB_STEP_SUMMARY
+            echo "- **IPA File**: $(ls -lh build/ios/iphoneos/ios_no_sign.ipa)" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "### Build Information" >> $GITHUB_STEP_SUMMARY
+          echo "- **Type**: Unsigned IPA (Development Build)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Usage**: Can be installed on devices via Xcode or third-party tools" >> $GITHUB_STEP_SUMMARY
+          echo "- **Note**: For App Store distribution, proper signing certificates are required" >> $GITHUB_STEP_SUMMARY
