@@ -57,8 +57,11 @@ jobs:
           cd simple_live_app
           
           if [ "${{ github.event.inputs.build_type }}" = "release" ]; then
+            # Release版本构建 - 先删除签名配置避免错误
+            rm -f android/key.properties
             flutter build apk --release --split-per-abi
           else
+            # Debug版本构建 - 使用默认debug签名
             flutter build apk --debug
           fi
 
