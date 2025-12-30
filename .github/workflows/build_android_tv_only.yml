@@ -63,10 +63,11 @@ jobs:
           cd simple_live_tv_app
           flutter pub get
 
-      - name: Get Android dependencies
+      - name: Check Android setup
         run: |
           cd simple_live_tv_app/android
-          ./gradlew wrapper --gradle-version 8.0
+          echo "Android project setup verified"
+          ls -la gradlew*
 
       - name: Clean build cache
         if: ${{ github.event.inputs.clean_build == 'true' }}
