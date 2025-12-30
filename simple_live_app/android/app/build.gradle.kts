@@ -40,21 +40,28 @@ android {
     }
 
     signingConfigs {
-        // 创建release签名配置
-        create("release") {
-            keyAlias = keystoreProperties["keyAlias"] as? String ?: "simple_live"
-            keyPassword = keystoreProperties["keyPassword"] as? String ?: "android"
-            storeFile = keystoreProperties["storeFile"]?.let { file(it) }
-            storePassword = keystoreProperties["storePassword"] as? String ?: "android"
-            isV1SigningEnabled = true
-            isV2SigningEnabled = true
+        // 只有在有key.properties文件时才创建release签名配置
+        if (keystorePropertiesFile.exists() && keystoreProperties.containsKey("storeFile")) {
+            create("release") {
+                keyAlias = keystoreProperties["keyAlias"] as String
+                keyPassword = keystoreProperties["keyPassword"] as String
+                storeFile = file(keystoreProperties["storeFile"] as String)
+                storePassword = keystoreProperties["storePassword"] as String
+                isV1SigningEnabled = true
+                isV2SigningEnabled = true
+            }
         }
     }
 
     buildTypes {
         release {
-            // 使用release签名配置
-            signingConfig = signingConfigs.getByName("release")
+            // 根据是否存在签名配置选择签名方式
+            if (keystorePropertiesFile.exists() && keystoreProperties.containsKey("storeFile")) {
+                signingConfig = signingConfigs.getByName("release")
+            } else {
+                // 使用debug签名（对于未签名构建）
+                signingConfig = signingConfigs.findByName("debug") ?: signingConfigs.getByName("release")
+            }
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(
