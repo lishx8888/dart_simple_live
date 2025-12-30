@@ -1,0 +1,161 @@
+name: Build Android TV APK Only
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_type:
+        description: 'Build type'
+        required: true
+        default: 'debug'
+        type: choice
+        options:
+          - debug
+          - release
+      flutter_version:
+        description: 'Flutter version'
+        required: false
+        default: '3.38.5'
+        type: string
+      flutter_channel:
+        description: 'Flutter channel'
+        required: false
+        default: 'stable'
+        type: choice
+        options:
+          - stable
+          - beta
+          - dev
+      split_apks:
+        description: 'Split APKs by architecture (release only)'
+        required: false
+        default: false
+        type: boolean
+      clean_build:
+        description: 'Clean build cache before building'
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  build_tv:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ github.event.inputs.flutter_version || '3.38.5' }}
+          channel: ${{ github.event.inputs.flutter_channel || 'stable' }}
+          cache: true
+
+      - name: Get Flutter dependencies
+        run: |
+          cd simple_live_tv_app
+          flutter pub get
+
+      - name: Get Android dependencies
+        run: |
+          cd simple_live_tv_app/android
+          ./gradlew wrapper --gradle-version 8.0
+
+      - name: Clean build cache
+        if: ${{ github.event.inputs.clean_build == 'true' }}
+        run: |
+          cd simple_live_tv_app
+          flutter clean
+          cd android
+          ./gradlew clean
+
+      - name: Build Android TV APK
+        run: |
+          cd simple_live_tv_app
+          
+          if [ "${{ github.event.inputs.build_type }}" = "release" ]; then
+            echo "Building release APK for Android TV..."
+            
+            if [ "${{ github.event.inputs.split_apks }}" = "true" ]; then
+              echo "Building split APKs by architecture..."
+              flutter build apk --release --split-per-abi
+            else
+              echo "Building single APK..."
+              flutter build apk --release
+            fi
+            
+            echo "APK build completed successfully!"
+            ls -la build/outputs/flutter-apk/
+            
+            # Create a bundle info file
+            cat > tv_build_info.txt << EOF
+            Build Type: Release
+            Build Time: $(date)
+            Split APKs: ${{ github.event.inputs.split_apks }}
+            Flutter Version: ${{ github.event.inputs.flutter_version || '3.38.5' }}
+            Channel: ${{ github.event.inputs.flutter_channel || 'stable' }}
+            Target: Android TV
+            Architecture: ${{ github.event.inputs.split_apks == 'true' ? 'Multi-architecture split' : 'Universal' }}
+            EOF
+            
+          else
+            echo "Building debug APK for Android TV..."
+            flutter build apk --debug
+            echo "Debug APK build completed successfully!"
+            ls -la build/outputs/flutter-apk/
+            
+            # Create a bundle info file
+            cat > tv_build_info.txt << EOF
+            Build Type: Debug
+            Build Time: $(date)
+            Flutter Version: ${{ github.event.inputs.flutter_version || '3.38.5' }}
+            Channel: ${{ github.event.inputs.flutter_channel || 'stable' }}
+            Target: Android TV
+            Architecture: Universal
+            EOF
+          fi
+
+      - name: Upload APK artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-tv-apk-${{ github.event.inputs.build_type || 'debug' }}
+          path: |
+            simple_live_tv_app/build/outputs/flutter-apk/*.apk
+            simple_live_tv_app/tv_build_info.txt
+          retention-days: 30
+
+      - name: Show APK info
+        run: |
+          echo "=== Android TV APK Build Summary ==="
+          echo "Build Type: ${{ github.event.inputs.build_type || 'debug' }}"
+          echo "Target: Android TV"
+          echo "Flutter Version: ${{ github.event.inputs.flutter_version || '3.38.5' }}"
+          echo ""
+          
+          if [ "${{ github.event.inputs.build_type }}" = "release" ]; then
+            echo "Generated APK files:"
+            ls -lh simple_live_tv_app/build/outputs/flutter-apk/*.apk
+            echo ""
+            echo "APK Size Summary:"
+            for apk in simple_live_tv_app/build/outputs/flutter-apk/*.apk; do
+              if [ -f "$apk" ]; then
+                size=$(ls -lh "$apk" | awk '{print $5}')
+                filename=$(basename "$apk")
+                echo "  $filename: $size"
+              fi
+            done
+          else
+            echo "Debug APK:"
+            ls -lh simple_live_tv_app/build/outputs/flutter-apk/*.apk
+          fi
+          
+          echo ""
+          echo "Build Info:"
+          cat simple_live_tv_app/tv_build_info.txt
