@@ -1,0 +1,79 @@
+name: Build Android APK (Simple)
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_type:
+        description: 'Build type'
+        required: true
+        default: 'release'
+        type: choice
+        options:
+          - release
+          - debug
+
+jobs:
+  build-android:
+    runs-on: ubuntu-latest
+    
+    permissions:
+      contents: read
+    
+    steps:
+      # 签出代码
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # 设置JAVA环境
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: "zulu"
+          java-version: "17"
+
+      # 设置Flutter环境
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.38.0"
+          channel: "stable"
+          cache: true
+
+      # 安装Android构建依赖
+      - name: Install Android dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y lib32z1 lib32ncurses6
+
+      # 获取依赖
+      - name: Get dependencies
+        run: |
+          cd simple_live_app
+          flutter pub get
+
+      # 构建APK
+      - name: Build APK
+        run: |
+          cd simple_live_app
+          
+          if [ "${{ github.event.inputs.build_type }}" = "release" ]; then
+            flutter build apk --release --split-per-abi
+          else
+            flutter build apk --debug
+          fi
+
+      # 显示APK信息
+      - name: Show APK info
+        run: |
+          cd simple_live_app
+          echo "=== APK Files ==="
+          find build/app/outputs/flutter-apk -name "*.apk" -exec ls -lh {} \;
+
+      # 上传APK到Artifacts
+      - name: Upload APK to Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-apk-${{ github.event.inputs.build_type }}
+          path: |
+            simple_live_app/build/app/outputs/flutter-apk/*.apk
+          retention-days: 7

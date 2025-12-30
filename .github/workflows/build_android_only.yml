@@ -74,7 +74,8 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: ${{ github.event.inputs.flutter_channel }}
+          flutter-version: "3.38.0"
+          channel: "stable"
           cache: true
 
       # 可选：清理构建缓存
