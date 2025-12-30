@@ -1,10 +1,10 @@
-name: Build Android APK (Simple)
+name: Build Unsigned APK
 
 on:
   workflow_dispatch:
     inputs:
-      build_type:
-        description: 'Build type'
+      build_mode:
+        description: 'Build mode'
         required: true
         default: 'release'
         type: choice
@@ -13,7 +13,7 @@ on:
           - debug
 
 jobs:
-  build-android:
+  build-unsigned-apk:
     runs-on: ubuntu-latest
     
     permissions:
@@ -51,16 +51,16 @@ jobs:
           cd simple_live_app
           flutter pub get
 
-      # 构建APK
-      - name: Build APK
+      # 构建未签名APK
+      - name: Build unsigned APK
         run: |
           cd simple_live_app
           
-          if [ "${{ github.event.inputs.build_type }}" = "release" ]; then
-            # Release版本构建 - 使用debug签名以避免错误
-            flutter build apk --release --split-per-abi --target-platform android-arm64
+          if [ "${{ github.event.inputs.build_mode }}" = "release" ]; then
+            echo "Building unsigned release APK..."
+            flutter build apk --release --no-codesign --split-per-abi
           else
-            # Debug版本构建 - 使用默认debug签名
+            echo "Building debug APK..."
             flutter build apk --debug
           fi
 
@@ -68,14 +68,32 @@ jobs:
       - name: Show APK info
         run: |
           cd simple_live_app
-          echo "=== APK Files ==="
+          echo "=== Generated APK files ==="
           find build/app/outputs/flutter-apk -name "*.apk" -exec ls -lh {} \;
+          echo ""
+          echo "=== APK Details ==="
+          find build/app/outputs/flutter-apk -name "*.apk" -exec echo "File: {}" \; -exec file {} \;
 
       # 上传APK到Artifacts
       - name: Upload APK to Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: android-apk-${{ github.event.inputs.build_type }}
+          name: unsigned-android-apk-${{ github.event.inputs.build_mode }}
           path: |
             simple_live_app/build/app/outputs/flutter-apk/*.apk
           retention-days: 7
+
+      # 创建构建摘要
+      - name: Create build summary
+        run: |
+          cd simple_live_app
+          echo "## Android APK Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Build Type**: ${{ github.event.inputs.build_mode }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Flutter Version**: 3.38.5" >> $GITHUB_STEP_SUMMARY
+          echo "**Build Time**: $(date)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Generated APK Files" >> $GITHUB_STEP_SUMMARY
+          find build/app/outputs/flutter-apk -name "*.apk" -exec ls -lh {} \; | while read line; do
+            echo "- $line" >> $GITHUB_STEP_SUMMARY
+          done

@@ -40,21 +40,20 @@ android {
     }
 
     signingConfigs {
-        if (keystoreProperties.containsKey("storeFile")) {
-            create("release") {
-                keyAlias = keystoreProperties["keyAlias"] as? String ?: "simple_live"
-                keyPassword = keystoreProperties["keyPassword"] as? String ?: "password"
-                storeFile = keystoreProperties["storeFile"]?.let { file(it) }
-                storePassword = keystoreProperties["storePassword"] as? String ?: "password"
-                isV1SigningEnabled = true
-                isV2SigningEnabled = true
-            }
+        // 创建release签名配置
+        create("release") {
+            keyAlias = keystoreProperties["keyAlias"] as? String ?: "simple_live"
+            keyPassword = keystoreProperties["keyPassword"] as? String ?: "android"
+            storeFile = keystoreProperties["storeFile"]?.let { file(it) }
+            storePassword = keystoreProperties["storePassword"] as? String ?: "android"
+            isV1SigningEnabled = true
+            isV2SigningEnabled = true
         }
     }
 
     buildTypes {
         release {
-            // Signing with the debug keys for now, so `flutter run --release` works.
+            // 使用release签名配置
             signingConfig = signingConfigs.getByName("release")
             isMinifyEnabled = true
             isShrinkResources = true
