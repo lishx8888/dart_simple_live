@@ -60,21 +60,19 @@ jobs:
 
       - name: Get dependencies
         run: |
-          cd simple_live_tv_app
           echo "Getting Flutter dependencies..."
-          flutter pub get
+          cd simple_live_tv_app && flutter pub get
 
       - name: Clean build cache
         if: ${{ github.event.inputs.clean_build == 'true' }}
         run: |
-          cd simple_live_tv_app
           echo "Cleaning build cache..."
-          flutter clean
-          flutter pub get
+          cd simple_live_tv_app && flutter clean && flutter pub get
 
       - name: Build Android TV APK
         run: |
-          cd simple_live_tv_app
+          echo "Building Android TV APK..."
+          cd simple_live_tv_app && (
           
           if [ "${{ github.event.inputs.build_type }}" = "release" ]; then
             echo "Building release APK for Android TV..."
@@ -99,9 +97,9 @@ jobs:
             ls -la build/app/outputs/flutter-apk/
             ARCH_TYPE="Universal"
           fi
+          )
           
           # Create build info file
-          cd simple_live_tv_app
           cat > tv_build_info.txt << EOF
           Build Type: ${{ github.event.inputs.build_type || 'debug' }}
           Build Time: $(date)
@@ -112,6 +110,7 @@ jobs:
           Architecture: $ARCH_TYPE
           Project: simple_live_tv_app
           EOF
+          )
 
       - name: Upload APK artifacts
         uses: actions/upload-artifact@v4
@@ -133,15 +132,33 @@ jobs:
           
           # 检查目录结构
           echo "Checking directory structure:"
-          ls -la simple_live_tv_app/
+          if [ -d "simple_live_tv_app" ]; then
+            ls -la simple_live_tv_app/
+          else
+            echo "simple_live_tv_app directory not found, checking current directory:"
+            ls -la
+          fi
           echo ""
+          
+          # 查找APK文件
+          APK_DIR="build/app/outputs/flutter-apk/"
+          if [ -d "simple_live_tv_app/$APK_DIR" ]; then
+            APK_PATH="simple_live_tv_app/$APK_DIR"
+          elif [ -d "$APK_DIR" ]; then
+            APK_PATH="$APK_DIR"
+          else
+            echo "APK directory not found!"
+            echo "Available directories:"
+            find . -name "*.apk" -type f 2>/dev/null || echo "No APK files found"
+            exit 0
+          fi
           
           if [ "${{ github.event.inputs.build_type }}" = "release" ]; then
             echo "Generated APK files:"
-            ls -lh simple_live_tv_app/build/app/outputs/flutter-apk/*.apk
+            ls -lh "$APK_PATH"*.apk
             echo ""
             echo "APK Size Summary:"
-            for apk in simple_live_tv_app/build/app/outputs/flutter-apk/*.apk; do
+            for apk in "$APK_PATH"*.apk; do
               if [ -f "$apk" ]; then
                 size=$(ls -lh "$apk" | awk '{print $5}')
                 filename=$(basename "$apk")
@@ -150,9 +167,15 @@ jobs:
             done
           else
             echo "Debug APK:"
-            ls -lh simple_live_tv_app/build/app/outputs/flutter-apk/*.apk
+            ls -lh "$APK_PATH"*.apk
           fi
           
           echo ""
           echo "Build Info:"
-          cat simple_live_tv_app/tv_build_info.txt
+          if [ -f "simple_live_tv_app/tv_build_info.txt" ]; then
+            cat simple_live_tv_app/tv_build_info.txt
+          elif [ -f "tv_build_info.txt" ]; then
+            cat tv_build_info.txt
+          else
+            echo "Build info file not found"
+          fi
