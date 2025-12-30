@@ -1,0 +1,146 @@
+name: Build Android APK Only
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_type:
+        description: 'Build type'
+        required: true
+        default: 'release'
+        type: choice
+        options:
+          - release
+          - debug
+      flutter_channel:
+        description: 'Flutter channel'
+        required: true
+        default: 'stable'
+        type: choice
+        options:
+          - stable
+          - beta
+          - dev
+      split_per_abi:
+        description: 'Split APK per ABI (smaller file size)'
+        required: false
+        default: true
+        type: boolean
+      clean_before_build:
+        description: 'Clean build cache before building'
+        required: false
+        default: true
+        type: boolean
+
+jobs:
+  build-android:
+    runs-on: macos-latest
+    
+    permissions:
+      contents: read
+    
+    steps:
+      # 签出代码
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: master
+
+      # APK签名设置（仅Release版本需要）
+      - name: Download Android keystore
+        if: github.event.inputs.build_type == 'release'
+        id: android_keystore
+        uses: timheuer/base64-to-file@v1.2
+        with:
+          fileName: keystore.jks
+          encodedString: ${{ secrets.KEYSTORE_BASE64 }}
+          
+      - name: Create key.properties
+        if: github.event.inputs.build_type == 'release'
+        run: |
+          echo "storeFile=${{ steps.android_keystore.outputs.filePath }}" > simple_live_app/android/key.properties
+          echo "storePassword=${{ secrets.STORE_PASSWORD }}" >> simple_live_app/android/key.properties
+          echo "keyPassword=${{ secrets.KEY_PASSWORD }}" >> simple_live_app/android/key.properties
+          echo "keyAlias=${{ secrets.KEY_ALIAS }}" >> simple_live_app/android/key.properties
+
+      # 设置JAVA环境
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: "zulu"
+          java-version: "17"
+          cache: "gradle"
+
+      # 设置Flutter环境
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ github.event.inputs.flutter_channel }}
+          cache: true
+
+      # 可选：清理构建缓存
+      - name: Clean build cache
+        if: github.event.inputs.clean_before_build == 'true'
+        run: |
+          cd simple_live_app
+          flutter clean
+
+      # 获取依赖
+      - name: Get dependencies
+        run: |
+          cd simple_live_app
+          flutter pub get
+
+      # 构建APK
+      - name: Build APK
+        run: |
+          cd simple_live_app
+          FLUTTER_BUILD_NAME=${{ github.run_number }}
+          FLUTTER_BUILD_NUMBER=${{ github.run_number }}
+          
+          if [ "${{ github.event.inputs.build_type }}" = "release" ]; then
+            if [ "${{ github.event.inputs.split_per_abi }}" = "true" ]; then
+              flutter build apk --release --split-per-abi
+            else
+              flutter build apk --release
+            fi
+          else
+            flutter build apk --debug
+          fi
+
+      # 显示APK信息
+      - name: Show APK info
+        run: |
+          cd simple_live_app
+          if [ "${{ github.event.inputs.split_per_abi }}" = "true" ]; then
+            ls -la build/app/outputs/flutter-apk/
+          else
+            ls -la build/app/outputs/flutter-apk/app-${{ github.event.inputs.build_type }}.apk
+          fi
+
+      # 计算APK大小
+      - name: Calculate APK size
+        run: |
+          cd simple_live_app
+          if [ "${{ github.event.inputs.split_per_abi }}" = "true" ]; then
+            echo "APK files and sizes:" >> $GITHUB_STEP_SUMMARY
+            ls -lah build/app/outputs/flutter-apk/ | grep .apk >> $GITHUB_STEP_SUMMARY
+          else
+            echo "APK file size:" >> $GITHUB_STEP_SUMMARY
+            ls -lah build/app/outputs/flutter-apk/app-${{ github.event.inputs.build_type }}.apk >> $GITHUB_STEP_SUMMARY
+          fi
+
+      # 上传APK到Artifacts
+      - name: Upload APK to Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-apk-${{ github.event.inputs.build_type }}-${{ github.run_number }}
+          path: |
+            simple_live_app/build/app/outputs/flutter-apk/*.apk
+          retention-days: 30
+
+      # 清理构建文件（可选）
+      - name: Clean up
+        if: always()
+        run: |
+          cd simple_live_app
+          flutter clean
